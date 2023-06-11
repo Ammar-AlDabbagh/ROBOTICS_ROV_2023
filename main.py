@@ -287,8 +287,7 @@ def main_print():
 
         for joystick in joysticks.values():
             joystick.print_data(screen)
-            
-            # joystick.send_serial()
+            joystick.send_serial()
 
         # Go ahead and update the screen with what we've drawn.
         pygame.display.update()
@@ -341,5 +340,5 @@ def main(verbose=False):
 
 
 if __name__ == "__main__":
-    main(True)
+    main()
     pygame.quit()
