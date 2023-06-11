@@ -6,7 +6,7 @@ import math
 pygame.init()
 
 WIDTH = 700
-HEIGHT = 900
+HEIGHT = 1050
 
 # Class for printing text on the screen
 
@@ -72,9 +72,9 @@ class Controller:
         printer.indent()
 
     def get_data(self):
-        self.axes =    {i: 100 * round(self.controller.get_axis(i),   2) for i in range(self.numaxes)}
-        self.buttons = {i:       round(self.controller.get_button(i), 2) for i in range(self.numbuttons)}
-        self.hats =    {i: 100 * round(self.controller.get_hat(i),    2) for i in range(self.numhats)}
+        self.axes =    {i: int(100 * round(self.controller.get_axis(i),   2)) for i in range(self.numaxes)}
+        self.buttons = {i: int(      round(self.controller.get_button(i), 2)) for i in range(self.numbuttons)}
+        self.hats =    {i: int(100 * round(self.controller.get_hat(i),    2)) for i in range(self.numhats)}
 
     def print_data(self, screen, printer=None):
         self.get_data()
@@ -117,8 +117,8 @@ class ProController(Controller):
         
             
 
-        self.buttons['ZL'] = int((self.axes.pop(4)) == 100)  # type: ignore
-        self.buttons['ZR'] = int((self.axes.pop(5)) == 100)  # type: ignore
+        self.buttons['ZL'] = int((self.axes.pop(4)) != 0)  # type: ignore
+        self.buttons['ZR'] = int((self.axes.pop(5)) != 0)  # type: ignore
 
         axesMap = ['L_V', 'L_H', 'R_V', 'R_H']
         self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
@@ -130,13 +130,52 @@ class ProController(Controller):
             mltp =  1.4 #1 + (math.sin(math.pi/4) / 2) (mathimatically correct number, doesn't work because the controller is not perfect)
             
             if val > 0:
-                  val =  100 if (output := val*mltp) >  100 else output
-            else: val = -100 if (output := val*mltp) < -100 else output
+                  val =  100 if (output := val*mltp) >  100 else round(output)
+            else: val = -100 if (output := val*mltp) < -100 else round(output)
             
-            val = 5 * round(val/5) #clip val to nearest multiple of 5
-            
+            #val = 5 * round(val/5) #clip val to nearest multiple of 5
             
             self.axes[key] = val
+
+
+class PS5Controller(Controller):
+    def __init__(self, controller, printer=None):
+        super().__init__(controller, printer)
+        self.numbuttons = 16
+        self.model_num = 0  # switch pro controller
+        self.serial_init = False
+
+    def get_data(self):
+        super().get_data()
+
+        buttonsMap = ['B', 'A', 'Y', 'X', 'Minus', 'Home', 'Plus', 'L_Stick', 'R_Stick', 'L', 'R', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'Capture']
+
+        self.buttons = {buttonsMap[i]: v for i, v in enumerate(self.buttons.values())}
+        
+            
+
+        self.buttons['ZL'] = int((self.axes.pop(4)) != -100)  # type: ignore
+        self.buttons['ZR'] = int((self.axes.pop(5)) != -100)  # type: ignore
+
+        axesMap = ['L_V', 'L_H', 'R_V', 'R_H']
+        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
+        
+        for key, val in self.axes.items():
+            
+            
+            if val in range(-10,10): val = 0
+            
+            mltp =  1.375 #1 + (math.sin(math.pi/4) / 2) (mathimatically correct number, doesn't work because the controller is not perfect)
+            
+            if val > 0:
+                  val =  100 if (output := val*mltp) >  100 else round(output)
+            else: val = -100 if (output := val*mltp) < -100 else round(output)
+            
+            #val = 5 * round(val/5) #clip val to nearest multiple of 5
+            self.axes[key] = val
+            continue
+            
+            
 
 
         self.buttons = {el: self.buttons[el] for el in [
@@ -160,8 +199,26 @@ class ProController(Controller):
         arr = str([self.model_num]+list(self.axes.values()) + list(self.buttons.values()))  # [0] means pro controller.
         print(arr)
 
-# Print the number of connected joysticks
+        self.buttons = {el: self.buttons[el] for el in [
+            'A', 'B', 'X', 'Y',
+            'UP', 'DOWN', 'LEFT', 'RIGHT',
+            'L', 'R', 'ZL', 'ZR', 'Plus',
+            'Minus', 'Home', 'Capture', 'L_Stick', 'R_Stick'
+        ]}
+        self.axes = {el: self.axes[el] for el in ['L_H', 'L_V', 'R_H', 'R_V']}
 
+    def send_serial(self, com='COM5'):
+        if not self.serial_init:
+            self.ser = serial.Serial(com, 9600, timeout=1)
+            self.serial_init = True
+
+        arr = str([self.model_num]+list(self.axes.values()) + list(self.buttons.values()))  # [0] means pro controller.
+        self.ser.write(arr.encode())
+        print(self.ser.read_all().decode())
+
+    def debug(self):
+        arr = str([self.model_num]+list(self.axes.values()) + list(self.buttons.values()))  # [0] means pro controller.
+        print(arr)
 
 def print_numjoys(screen, printer=None):
     printer = TextPrint() if not printer else printer
@@ -210,6 +267,8 @@ def main_print():
                 match joy:
                     case 'Nintendo Switch Pro Controller':
                         joy = ProController(js.Joystick(event.device_index), text_print)
+                    case 'PS5 Controller':
+                        joy = PS5Controller(js.Joystick(event.device_index), text_print)
                     case _:
                         joy = Controller(js.Joystick(event.device_index), text_print)
 
@@ -228,6 +287,7 @@ def main_print():
 
         for joystick in joysticks.values():
             joystick.print_data(screen)
+            
             # joystick.send_serial()
 
         # Go ahead and update the screen with what we've drawn.
@@ -259,9 +319,11 @@ def main(verbose=False):
                 joy = js.Joystick(event.device_index).get_name()
                 match joy:
                     case 'Nintendo Switch Pro Controller':
-                        joy = ProController(js.Joystick(event.device_index))
+                        joy = ProController(js.Joystick(event.device_index), text_print)
+                    case 'PS5 Controller':
+                        joy = PS5Controller(js.Joystick(event.device_index), text_print)
                     case _:
-                        joy = Controller(js.Joystick(event.device_index))
+                        joy = Controller(js.Joystick(event.device_index), text_print)
 
                 joysticks[joy.jid] = joy
                 print(f"Joystick {joy.jid} connected")
