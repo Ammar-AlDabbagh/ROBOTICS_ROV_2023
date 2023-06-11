@@ -336,7 +336,7 @@ def main(verbose=False):
             joystick.send_serial()
             # joystick.debug()
 
-        clock.tick(6)
+        clock.tick(60)
 
 
 if __name__ == "__main__":
