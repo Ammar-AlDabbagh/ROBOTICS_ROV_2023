@@ -318,11 +318,11 @@ def main(verbose=False):
                 joy = js.Joystick(event.device_index).get_name()
                 match joy:
                     case 'Nintendo Switch Pro Controller':
-                        joy = ProController(js.Joystick(event.device_index), text_print)
+                        joy = ProController(js.Joystick(event.device_index))
                     case 'PS5 Controller':
-                        joy = PS5Controller(js.Joystick(event.device_index), text_print)
+                        joy = PS5Controller(js.Joystick(event.device_index))
                     case _:
-                        joy = Controller(js.Joystick(event.device_index), text_print)
+                        joy = Controller(js.Joystick(event.device_index))
 
                 joysticks[joy.jid] = joy
                 print(f"Joystick {joy.jid} connected")
@@ -336,7 +336,7 @@ def main(verbose=False):
             joystick.send_serial()
             # joystick.debug()
 
-        clock.tick(60)
+        clock.tick(5)
 
 
 if __name__ == "__main__":
