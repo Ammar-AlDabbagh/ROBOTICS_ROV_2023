@@ -145,7 +145,7 @@ void useParsedData()
     int mappedVal2 = booleanValues[9] ? 0 : (booleanValues[1] ? 100 : (booleanValues[2] ? -100 : (intValues[2] == 0) ? -128 : intValues[2]));   //if  R : brake, else if B    : reverse, else if X     : forward, else joystick_in
     int mappedVal3 = booleanValues[11]  ? 0 : (booleanValues[0] ? 100 : (booleanValues[3] ? -100 : (intValues[3] == 0) ? -128 : intValues[3])); //if ZR : brake, else if A    : reverse, else if Y     : forward, else joystick_in
     
-    /*debug print
+    //debug print
     Serial.print(mappedVal0);
     Serial.print(" ");
     Serial.print(mappedVal1);
@@ -153,7 +153,7 @@ void useParsedData()
     Serial.print(mappedVal2);
     Serial.print(" ");
     Serial.println(mappedVal3);
-    */
+    
     Driver1.move_power(mappedVal0, mappedVal1);
     Driver2.move_power(mappedVal2, mappedVal3);
     
