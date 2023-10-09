@@ -4,47 +4,47 @@
 #include <L298N.h>
 #include <L298NX2.h>
 // Motor 1 connections
-const uint8_t m1e = 7;
-const uint8_t m1a = 22;
-const uint8_t m1b = 23;
+const uint8_t m1e = 11;
+const uint8_t m1a = A0;
+const uint8_t m1b = A1;
 // Motor 2 connections
-const uint8_t m2e = 6;
-const uint8_t m2a = 28;
-const uint8_t m2b = 29;
+const uint8_t m2e = 10;
+const uint8_t m2a = A2;
+const uint8_t m2b = A3;
 
 // Motor C connections
-const uint8_t m3e = 5;
-const uint8_t m3a = 34;
-const uint8_t m3b = 35;
+const uint8_t m3e = 9;
+const uint8_t m3a = A4;
+const uint8_t m3b = A5;
 
 // Stepper 1
-const uint8_t enablePin = 13;
-const uint8_t dirPin = 30;
-const uint8_t stepPin = 2;
+const uint8_t enablePin = 8;
+const uint8_t dirPin = 7;
+const uint8_t stepPin = 4;
 
 // Stepper 2
-const uint8_t s2p1 = 36;
-const uint8_t s2p2 = 37;
-const uint8_t s2p3 = 38;
-const uint8_t s2p4 = 39;
+const uint8_t s2p1 = 6;
+const uint8_t s2p2 = 5;
+const uint8_t s2p3 = 3;
+const uint8_t s2p4 = 2;
 
 // Define arm speeds
 
-const uint8_t armMicrosteps = 4;
+const uint8_t armMicrosteps = 8;
 const int16_t armRevolution = 200 * armMicrosteps;
-const uint8_t armSpeedMultiplier = 4;
-const uint8_t armSecondsToMaxSpeed = 1;
+const uint8_t armSpeedMultiplier = 2;
+const uint8_t armSecondsToMaxSpeed = 4;
 
-const float armMaxSpeed = armRevolution * armSpeedMultiplier; // 4000/armSpeedMultiplier; //Max relieble speed capable by arduino
+const float armMaxSpeed = armRevolution / armSpeedMultiplier; // 4000/armSpeedMultiplier; //Max relieble speed capable by arduino
 const float armAccel = armMaxSpeed / armSecondsToMaxSpeed;    // maxspeed reach in s seconds
 
 // Define forearm speeds
 
 const int16_t forearmRevolution = 2038;
-const uint8_t forearmSpeedMultiplier = 1;
-const uint8_t forearmSecondsToMaxSpeed = 0.5;
+const uint8_t forearmSpeedMultiplier = 4;
+const uint8_t forearmSecondsToMaxSpeed = 4;
 
-const float forearmMaxSpeed = forearmRevolution * forearmSpeedMultiplier; // 4000/armSpeedMultiplier; //Max relieble speed capable by arduino
+const float forearmMaxSpeed = forearmRevolution / forearmSpeedMultiplier; // 4000/armSpeedMultiplier; //Max relieble speed capable by arduino
 const float forearmAccel = forearmMaxSpeed / forearmSecondsToMaxSpeed;    // maxspeed reach in s seconds
 
 #define stepsToDegrees(degree, revolution) map(degree, 0, 360, 0, revolution)
@@ -53,6 +53,8 @@ const float forearmAccel = forearmMaxSpeed / forearmSecondsToMaxSpeed;    // max
 
 L298N claw(m3e, m3a, m3b);
 L298NX2 car(m1e, m1a, m1b, m2e, m2a, m2b);
+//L298N carA(m1e, m1a, m1b);
+//L298N carB(m2e, m2a, m2b);
 
 #define carSetSpeed(a, b) \
     car.setSpeedA(a);     \
@@ -199,38 +201,37 @@ void parseData()
 }
 
 void useParsedData()
-{
-    static bool wasPressedL = false;
-    static bool wasPressedR = false;
-    int_fast8_t armVal = (boolVals[1] - boolVals[2]);
-    int_fast8_t forearmVal = (boolVals[0] - boolVals[4]);
+{   
+    const int_fast8_t armVal = (boolVals[1] - boolVals[2]);
+    const int_fast8_t forearmVal = (boolVals[0] - boolVals[3]);
+    static int_fast8_t preArmVal = armVal;
+    static int_fast8_t preForearmVal = forearmVal;
+    
 
-    arm.move(armVal * 99999);
-    forearm.move(armVal * 99999);
-    /*uint_fast8_t preArmVal = (arm.distanceToGo() == 0) ? 0 : (arm.distanceToGo() < 0) ? -1
-                                                                                      : 1;
     if (preArmVal != armVal)
     {
-        Serial.println(armVal)
-        arm.move(armVal * 99999);
+        armVal == 0 ? arm.stop() : arm.move(armVal * 99999);
+        preArmVal = armVal;
     }
 
-    uint_fast8_t preForearmVal = (forearm.distanceToGo() == 0) ? 0 : (forearm.distanceToGo() < 0) ? -1
-                                                                                                  : 1;
     if (preForearmVal != forearmVal)
     {
-        forearm.move(forearmVal * 99999);
-    }*/
+        forearmVal == 0 ? forearm.stop() : forearm.move(forearmVal * 99999 * 99999);
+        preForearmVal = forearmVal;
+
+    }
 
     clawDir = (intVals[2] == 0) ? -1 : (intVals[2] > 0) ? 0
                                                         : 1;
     int clawVal = map(abs(intVals[2]), 0, 100, 0, 255);
     claw.setSpeed(clawVal);
 
-    uint_fast8_t carM1 = map(intVals[4], -100, 100, 0, 150);
-    uint_fast8_t carM2 = map(intVals[5], -100, 100, 0, 150);
+    uint_fast8_t carM1 = map(intVals[4], -100, 100, 0, 255);
+    uint_fast8_t carM2 = map(intVals[5], -100, 100, 0, 255);
     carSetSpeed(carM1, carM2);
-
+    
+    static bool wasPressedL = false;
+    static bool wasPressedR = false;
     if (boolVals[8])
     {
         wasPressedL = true;

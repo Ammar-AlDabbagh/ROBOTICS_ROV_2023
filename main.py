@@ -111,7 +111,7 @@ class Controller:
         boolVals = list(self.buttons.values()) + [0] * (INTVALS - len(self.buttons.values()))
 
         data = str([self.model_num] + intVals + boolVals)
-        print(data)
+        #print(data)
         if data != self.serial_cache:
             self.ser.write(data.encode())
             self.serial_cache = data
@@ -298,7 +298,7 @@ class Game:
             if self.sendserial:
                 joystick.send_serial(self.com)
         #joystick.debug()
-        self.clock.tick(5)
+        self.clock.tick(120)
         
 
 
@@ -343,7 +343,7 @@ class GameVerbose(Game):
                 joystick.send_serial(self.com)
         #joystick.debug()
         pygame.display.update()
-        self.clock.tick(5)
+        self.clock.tick(120)
 
     def start_loop(self):
         while not self.done:
@@ -356,7 +356,7 @@ class GameVerbose(Game):
 
 
 if __name__ == "__main__":
-    Game(com='COM8', sendserial=1).start_loop()
+    GameVerbose(com='COM9', sendserial=1).start_loop()
     pygame.quit()
 
 
