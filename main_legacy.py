@@ -111,7 +111,6 @@ class Controller:
         boolVals = list(self.buttons.values()) + [0] * (INTVALS - len(self.buttons.values()))
 
         data = str([self.model_num] + intVals + boolVals)
-        #print(data)
         if data != self.serial_cache:
             self.ser.write(data.encode())
             self.serial_cache = data
@@ -252,111 +251,114 @@ def print_numjoys(screen, printer=None):
     printer.newline()
     printer.indent()
 
+# Main function for printing joystick information
 
-class Game:
-    def __init__(self, com='COM5', sendserial=True):
-        self.com = com
-        self.sendserial = sendserial
-        self.joysticks = {}
-        self.clock = pygame.time.Clock()
-        self.done = False
 
-    def handle_events(self):
+def main_print(com, sendserial):
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen.fill((255, 255, 255))
+    pygame.display.set_caption("Joystick example")
+
+    clock = pygame.time.Clock()
+    text_print = TextPrint()
+
+    # This dict can be left as-is, since pygame will generate a
+    # pygame.JOYDEVICEADDED event for every joystick connected
+    # at the start of the program.
+    joysticks = {}
+    print_numjoys(screen, text_print)
+    meta_printedx, meta_printedy = text_print.x, text_print.y
+
+    done = False
+
+    while not done:
+
+        text_print.reset()
+        text_print.x += meta_printedx
+        text_print.y += meta_printedy
+        screen.fill((255, 255, 255), [meta_printedx] + [meta_printedy] + [WIDTH, HEIGHT])
+
         for event in pygame.event.get():
-            match event.type:
-                case pygame.QUIT:
-                    self.done = True
-                case pygame.JOYDEVICEADDED:
-                    self.handle_joy_added(event)
-                case pygame.JOYDEVICEREMOVED:
-                    self.handle_joy_removed(event)
+            if event.type == pygame.QUIT:
+                done = True
 
-    def handle_joy_added(self, event):
+            # Handle hotplugging
+            if event.type == pygame.JOYDEVICEADDED:
 
-        joy = js.Joystick(event.device_index).get_name()
-        match joy:
-            case 'Nintendo Switch Pro Controller':
-                joy = ProController(js.Joystick(event.device_index))
-            case 'PS5 Controller':
-                joy = PS5Controller(js.Joystick(event.device_index))
-            case _:
-                joy = Controller(js.Joystick(event.device_index))
+                text_print.reset()
+                screen.fill((255, 255, 255))
+                print_numjoys(screen, text_print)
 
-        self.joysticks[joy.jid] = joy
-        print(f"Joystick {joy.jid} connected")
-        return joy
+                joy = js.Joystick(event.device_index).get_name()
+                match joy:
+                    case 'Nintendo Switch Pro Controller':
+                        joy = ProController(js.Joystick(event.device_index), text_print)
+                    case 'PS5 Controller':
+                        joy = PS5Controller(js.Joystick(event.device_index), text_print)
+                    case _:
+                        joy = Controller(js.Joystick(event.device_index), text_print)
 
-    def handle_joy_removed(self, event):
+                joysticks[joy.jid] = joy
+                joy.print_meta(screen)
+                meta_printedx, meta_printedy = text_print.x, text_print.y
+                print(f"Joystick {joy.jid} connected")
 
-        del self.joysticks[event.instance_id]
-        print(f"Joystick {event.instance_id} disconnected")
+            if event.type == pygame.JOYDEVICEREMOVED:
+                screen.fill((255, 255, 255))
+                text_print.reset()
+                print_numjoys(screen, text_print)
+                del joysticks[event.instance_id]
+                meta_printedx, meta_printedy = text_print.x, text_print.y
+                print(f"Joystick {event.instance_id} disconnected")
 
-    def main_loop(self):
-
-        for joystick in self.joysticks.values():
-            joystick.get_data()
-            if self.sendserial:
-                joystick.send_serial(self.com)
-        #joystick.debug()
-        self.clock.tick(120)
-        
-
-
-    def start_loop(self):
-        while not self.done:
-            self.handle_events()
-            self.main_loop()
-
-
-class GameVerbose(Game):
-    def __init__(self, printer=None, com='COM5', sendserial=True):
-        super().__init__(com, sendserial)
-
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.screen.fill((255, 255, 255))
-        pygame.display.set_caption("Joystick example")
-
-        self.printer = TextPrint() if not printer else printer
-        self.print_numjoys()
-        self.meta_printedx = self.printer.x
-        self.meta_printedy = self.printer.y
-
-    def print_numjoys(self):
-        self.printer.tprint(self.screen, f"Number of joysticks: {js.get_count()}")
-        self.printer.newline()
-        self.printer.indent()
-
-    def handle_joy_added(self, event):
-
-        self.printer.reset()
-        self.screen.fill((255, 255, 255))
-        print_numjoys(self.screen, self.printer)
-        joy = super().handle_joy_added(event)
-        joy.print_meta(self.screen, self.printer)
-        self.meta_printedx = self.printer.x
-        self.meta_printedy = self.printer.y
-
-    def main_loop(self):
-        for joystick in self.joysticks.values():
-            joystick.print_data(self.screen, self.printer)
-            if self.sendserial:
-                joystick.send_serial(self.com)
-        #joystick.debug()
+        for joystick in joysticks.values():
+            joystick.print_data(screen)
+            if sendserial:
+                joystick.send_serial(com)
+            joystick.debug()
+        # Go ahead and update the screen with what we've drawn.
         pygame.display.update()
-        self.clock.tick(120)
-
-    def start_loop(self):
-        while not self.done:
-            self.printer.reset()
-            self.printer.x += self.meta_printedx
-            self.printer.y += self.meta_printedy
-            self.screen.fill((255, 255, 255), [self.meta_printedx] + [self.meta_printedy] + [WIDTH, HEIGHT])
-            self.handle_events()
-            self.main_loop()
 
 
+def main(com='COM5', sendserial=True, verbose=True):
+    if verbose:
+        main_print(com, sendserial)
+        return
+
+    clock = pygame.time.Clock()
+    joysticks = {}
+
+    done = False
+
+    while not done:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
+
+            # Handle hotplugging
+            if event.type == pygame.JOYDEVICEADDED:
+
+                joy = js.Joystick(event.device_index).get_name()
+                match joy:
+                    case 'Nintendo Switch Pro Controller':
+                        joy = ProController(js.Joystick(event.device_index))
+                    case 'PS5 Controller':
+                        joy = PS5Controller(js.Joystick(event.device_index))
+                    case _:
+                        joy = Controller(js.Joystick(event.device_index))
+
+                joysticks[joy.jid] = joy
+                print(f"Joystick {joy.jid} connected")
+
+            if event.type == pygame.JOYDEVICEREMOVED:
+                del joysticks[event.instance_id]
+                print(f"Joystick {event.instance_id} disconnected")
+
+        for joystick in joysticks.values():
+            joystick.get_data()
+            if sendserial:
+                joystick.send_serial(com)
+            # joystick.debug()
 if __name__ == "__main__":
-    GameVerbose(com='COM9', sendserial=1).start_loop()
+    main(com='COM8', verbose=1, sendserial=0)
     pygame.quit()
-
-
