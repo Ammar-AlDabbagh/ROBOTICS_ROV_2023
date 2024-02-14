@@ -5,7 +5,7 @@ import math
 from time import sleep
 
 pygame.init()
-
+FPS=20
 WIDTH = 700
 HEIGHT = 1050
 
@@ -98,15 +98,13 @@ class Controller:
             printer.indent()
             for key, val in data.items():
                 printer.tprint(screen, f'{key}: {val}')
-            printer.newline()
             printer.unindent()
 
-    def send_serial(self, com='COM5'):
+    def send_serial(self, com='COM5', baud=9600):
         if not self.serial_init:
-            self.ser = serial.Serial(com, 74880, timeout=1)
+            self.ser = serial.Serial(com, baud, timeout=1)
             self.serial_init = True
-            sleep(3)
-
+            sleep(6)
         intVals = list(self.axes.values()) + [0] * (INTVALS - len(self.axes.values()))
         boolVals = list(self.buttons.values()) + [0] * (INTVALS - len(self.buttons.values()))
 
@@ -115,7 +113,9 @@ class Controller:
         if data != self.serial_cache:
             self.ser.write(data.encode())
             self.serial_cache = data
-            if (output := self.ser.read_all().decode()):
+    
+    def read_serial(self):
+        if (output := self.ser.read_all().decode()):
                 print(output)
 
     def debug(self):
@@ -154,6 +154,52 @@ class Keyboard:
 # Controller subclass for Nintendo Switch Pro Controller
 
 
+#class ProController(Controller):
+#    def __init__(self, controller, printer=None, applyOuterDeadZone=True):
+#        super().__init__(controller, printer, applyOuterDeadZone)
+#        self.numbuttons = 16
+#        self.model_num = 0  # switch pro controller
+#        self.serial_init = False
+#
+#    def get_data(self):
+#        super().get_data()
+#
+#        buttonsMap = ['A', 'B', 'X', 'Y', 'Minus', 'Home', 'Plus', 'L_Stick', 'R_Stick', 'L', 'R', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'Capture']
+#
+#        self.buttons = {buttonsMap[i]: v for i, v in enumerate(self.buttons.values())}
+#
+#        self.buttons['ZL'] = int((self.axes.pop(4)) > 0)  # type: ignore
+#        self.buttons['ZR'] = int((self.axes.pop(5)) > 0)  # type: ignore
+#
+#        self.buttons = {el: self.buttons[el] for el in [
+#            'A', 'B', 'X', 'Y',
+#            'UP', 'DOWN', 'LEFT', 'RIGHT',
+#            'L', 'R', 'ZL', 'ZR', 'Plus',
+#            'Minus', 'Home', 'Capture', 'L_Stick', 'R_Stick'
+#        ]}
+#
+#        axesMap = ['L_V', 'L_H', 'R_V', 'R_H']
+#        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
+#        for key, val in self.axes.items():
+#
+#            if val in range(-10, 10):
+#                val = 0
+#            if not self.applyOuterDeadZone:
+#
+#                mltp = 1.4  # 1 + (math.sin(math.pi/4) / 2) (mathimatically correct number, doesn't work because the controller is not perfect)
+#                if val > 0:
+#                    val = 100 if (output := val*mltp) > 100 else round(output)
+#                else:
+#                    val = -100 if (output := val*mltp) < -100 else round(output)
+#
+#            val = 5 * round(val/5)  # clip val to nearest multiple of 5
+#            self.axes[key] = val
+#
+#        self.axes = {el: self.axes[el] for el in ['L_H', 'L_V', 'R_H', 'R_V']}
+#        self.axes['L_H'] *= -1
+#        self.axes['R_H'] *= -1
+
+
 class ProController(Controller):
     def __init__(self, controller, printer=None, applyOuterDeadZone=True):
         super().__init__(controller, printer, applyOuterDeadZone)
@@ -163,14 +209,23 @@ class ProController(Controller):
 
     def get_data(self):
         super().get_data()
+        
+
 
         buttonsMap = ['A', 'B', 'X', 'Y', 'Minus', 'Home', 'Plus', 'L_Stick', 'R_Stick', 'L', 'R', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'Capture']
-
         self.buttons = {buttonsMap[i]: v for i, v in enumerate(self.buttons.values())}
+        
+        axesMap = ['L_V', 'L_H', 'R_V', 'R_H', 'ZL', 'ZR']
+        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
+        
+        
+        
+        self.buttons['ZL'] = int((self.axes['ZL']) > 0)  # type: ignore
+        self.buttons['ZR'] = int((self.axes['ZR']) > 0)  # type: ignore
 
-        self.buttons['ZL'] = int((self.axes.pop(4)) > 0)  # type: ignore
-        self.buttons['ZR'] = int((self.axes.pop(5)) > 0)  # type: ignore
-
+        self.axes['ZL'] += 100
+        self.axes['ZR'] += 100
+        
         self.buttons = {el: self.buttons[el] for el in [
             'A', 'B', 'X', 'Y',
             'UP', 'DOWN', 'LEFT', 'RIGHT',
@@ -178,26 +233,25 @@ class ProController(Controller):
             'Minus', 'Home', 'Capture', 'L_Stick', 'R_Stick'
         ]}
 
-        axesMap = ['L_V', 'L_H', 'R_V', 'R_H']
-        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
         for key, val in self.axes.items():
-
-            if val in range(-10, 10):
-                val = 0
-            if not self.applyOuterDeadZone:
-
-                mltp = 1.4  # 1 + (math.sin(math.pi/4) / 2) (mathimatically correct number, doesn't work because the controller is not perfect)
-                if val > 0:
+            if "Z" not in key:
+                if val in range(-10, 10):
+                    val = 0
+                if self.applyOuterDeadZone:
+                    mltp = 1.4  # 1 + (math.sin(math.pi/4) / 2) (mathimatically correct number, doesn't work because the controller is not perfect)                    if val > 0:
                     val = 100 if (output := val*mltp) > 100 else round(output)
                 else:
                     val = -100 if (output := val*mltp) < -100 else round(output)
 
-            val = 5 * round(val/5)  # clip val to nearest multiple of 5
-            self.axes[key] = val
+                val = 2 * round(val/2)  # clip val to nearest multiple of 5
+                self.axes[key] = val
+                    
+        
 
-        self.axes = {el: self.axes[el] for el in ['L_H', 'L_V', 'R_H', 'R_V']}
+        self.axes = {el: self.axes[el] for el in ['L_H', 'L_V', 'R_H', 'R_V', 'ZL', 'ZR']}
         self.axes['L_H'] *= -1
         self.axes['R_H'] *= -1
+        
 
 
 class PS5Controller(Controller):
@@ -211,11 +265,16 @@ class PS5Controller(Controller):
         super().get_data()
 
         buttonsMap = ['B', 'A', 'Y', 'X', 'Minus', 'Home', 'Plus', 'L_Stick', 'R_Stick', 'L', 'R', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'Capture']
-
         self.buttons = {buttonsMap[i]: v for i, v in enumerate(self.buttons.values())}
 
-        self.buttons['ZL'] = int((self.axes[4]) > 0)  # type: ignore
-        self.buttons['ZR'] = int((self.axes[5]) > 0)  # type: ignore
+        axesMap = ['L_V', 'L_H', 'R_V', 'R_H', 'ZL', 'ZR']
+        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
+        
+        self.axes['ZL'] += 100
+        self.axes['ZR'] += 100
+        
+        self.buttons['ZL'] = int((self.axes['ZL']) > 100)  # type: ignore
+        self.buttons['ZR'] = int((self.axes['ZR']) > 100)  # type: ignore
 
         self.buttons = {el: self.buttons[el] for el in [
             'A', 'B', 'X', 'Y',
@@ -224,8 +283,6 @@ class PS5Controller(Controller):
             'Minus', 'Home', 'Capture', 'L_Stick', 'R_Stick'
         ]}
 
-        axesMap = ['L_V', 'L_H', 'R_V', 'R_H', 'ZL', 'ZR']
-        self.axes = {axesMap[i]: v for i, v in enumerate(self.axes.values())}
         for key, val in self.axes.items():
             if "Z" not in key:
                 if val in range(-10, 10):
@@ -254,8 +311,9 @@ def print_numjoys(screen, printer=None):
 
 
 class Game:
-    def __init__(self, com='COM5', sendserial=True):
+    def __init__(self, com='COM5', baud=9600, sendserial=True):
         self.com = com
+        self.baud = baud
         self.sendserial = sendserial
         self.joysticks = {}
         self.clock = pygame.time.Clock()
@@ -296,9 +354,13 @@ class Game:
         for joystick in self.joysticks.values():
             joystick.get_data()
             if self.sendserial:
-                joystick.send_serial(self.com)
+                joystick.send_serial(self.com, self.baud)
+        
         #joystick.debug()
-        self.clock.tick(120)
+        if self.sendserial:
+            if (output := joystick.ser.read_all().decode()):
+                    print(output) 
+        self.clock.tick(FPS)
         
 
 
@@ -309,8 +371,8 @@ class Game:
 
 
 class GameVerbose(Game):
-    def __init__(self, printer=None, com='COM5', sendserial=True):
-        super().__init__(com, sendserial)
+    def __init__(self, printer=None, com='COM5', baud=9600, sendserial=True):
+        super().__init__(com, baud, sendserial)
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.screen.fill((255, 255, 255))
@@ -340,10 +402,14 @@ class GameVerbose(Game):
         for joystick in self.joysticks.values():
             joystick.print_data(self.screen, self.printer)
             if self.sendserial:
-                joystick.send_serial(self.com)
+                joystick.send_serial(self.com, self.baud)
+        
         #joystick.debug()
+        if self.sendserial:
+            if (output := joystick.ser.read_all().decode()):
+                    print(output)   
         pygame.display.update()
-        self.clock.tick(120)
+        self.clock.tick(FPS)
 
     def start_loop(self):
         while not self.done:
@@ -356,7 +422,5 @@ class GameVerbose(Game):
 
 
 if __name__ == "__main__":
-    GameVerbose(com='COM9', sendserial=1).start_loop()
+    Game(com='COM6', baud=57600, sendserial=1).start_loop()
     pygame.quit()
-
-
